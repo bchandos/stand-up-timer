@@ -1,0 +1,3 @@
+venv/
+tracking.txt
+*.pyc

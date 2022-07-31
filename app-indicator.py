@@ -5,9 +5,14 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('AppIndicator3', '0.1')
 from gi.repository import Gtk as gtk, AppIndicator3 as appindicator, GLib as glib
 
-from tracking import track_sitting, track_standing
+from tracking import get_todays_standing_time, track_standing
+
+CUMMULATIVE_TIME = 0
+STANDING = False
 
 def main():
+    global CUMMULATIVE_TIME
+    CUMMULATIVE_TIME += get_todays_standing_time()
     indicator = appindicator.Indicator.new(
         'stand-up-timer', 
         f'{os.getcwd()}/icons/icon.png',
@@ -26,11 +31,6 @@ def menu():
             'type': 'CheckMenuItem',
             'label': 'Stand Up',
             'f': stand_up
-        },
-        {
-            'type': 'CheckMenuItem',
-            'label': 'Sit Down',
-            'f': sit_down
         },
         {
             'type': 'SeparatorMenuItem',
@@ -64,16 +64,9 @@ def menu():
     return menu
   
 def stand_up(menu_item):
-    if menu_item.get_active():
-        print('Standing up.')
-        track_standing()
-        untoggle_others(menu_item)
-
-def sit_down(menu_item):
-    if menu_item.get_active():
-        print('Sitting down.')
-        track_sitting()
-        untoggle_others(menu_item)
+    global STANDING
+    STANDING = menu_item.get_active()
+    track_standing(menu_item.get_active())
 
 def get_stats(menu_item):
     w = gtk.Window(
@@ -83,19 +76,22 @@ def get_stats(menu_item):
     w.set_destroy_with_parent(True)
     w.show()
 
-def untoggle_others(menu_item):
-    menu = menu_item.get_parent()
-    children = menu.get_children()
-    for child in children:
-        if child != menu_item and isinstance(child, gtk.CheckMenuItem) and child.get_active():
-            child.set_active(False)
-
 def change_label(indicator):
-    time = datetime.datetime.now().strftime('%H:%M:%S')
-    indicator.set_label(time, '')
+    global CUMMULATIVE_TIME
+    global STANDING
+    CUMMULATIVE_TIME += 1 if STANDING else 0
+    indicator.set_label(format_cummulative_time(CUMMULATIVE_TIME), '')
     return True
 
+def format_cummulative_time(ct):
+    minutes, secs = divmod(ct, 60)
+    hour, minutes = divmod(minutes, 60)
+    return "%d:%02d:%02d" % (hour, minutes, secs)
+
 def quit_menu(_):
+    global STANDING
+    if STANDING:
+        track_standing(False)
     gtk.main_quit()
 
 if __name__ == '__main__':
